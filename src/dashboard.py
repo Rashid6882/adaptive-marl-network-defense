@@ -16,13 +16,22 @@ import json
 import os
 import sys
 
+import joblib
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import numpy as np
 import pandas as pd
 import streamlit as st
 
-from src.data import chronological_split, load_clean_dataset
+from src.evaluate_sim import (
+    make_policy_single,
+    make_policy_v1,
+    make_policy_v2,
+    policy_none,
+    policy_rule,
+)
+from src.sim_env import DefenseSim, load_split_cached
 from src.evaluate import (
     MODELS_DIR,
     OUTPUTS_DIR,
@@ -46,8 +55,7 @@ CLASS_COLORS = {
 
 @st.cache_resource(show_spinner="Loading dataset and trained models...")
 def load_everything():
-    df = load_clean_dataset()
-    _, test_df = chronological_split(df)
+    _, test_df = load_split_cached()
     det, fw, resp, scaler = load_models()
     single_model = None
     if os.path.exists(f"{MODELS_DIR}/single_agent.zip"):
@@ -91,8 +99,8 @@ test_df, det, fw, resp, scaler, single_model = load_everything()
 true_idx = test_df["Label"].map({c: i for i, c in enumerate(CLASSES)}).values
 summary = load_summary()
 
-tab_about, tab_live, tab_overview, tab_training = st.tabs(
-    ["What is this?", "Live Demo", "Baselines & Metrics", "Training Curves"]
+tab_about, tab_live, tab_v2, tab_overview, tab_training = st.tabs(
+    ["What is this?", "Live Demo", "v2: Interactive RL", "Baselines & Metrics", "Training Curves"]
 )
 
 with tab_about:
@@ -164,6 +172,185 @@ accuracy alone.
         "so \"repeated flows from the same attacker\" is approximated using the "
         "destination port instead (documented in the README)."
     )
+
+@st.cache_resource(show_spinner="Loading v2 simulator and policies...")
+def load_v2():
+    scaler_v2 = joblib.load(f"{MODELS_DIR}/scaler.joblib")
+    sim_v2 = DefenseSim(test_df, scaler_v2, seed=0)
+    policies = {"No defense": policy_none, "Rule-based": policy_rule}
+    for label, make in (
+        ("v2 MARL (interactive RL)", make_policy_v2),
+        ("v1 MARL (offline-trained)", make_policy_v1),
+        ("v2 single-agent", make_policy_single),
+    ):
+        pol = make()
+        if pol is not None:
+            policies[label] = pol
+    return sim_v2, policies
+
+
+def simulate_window(sim_v2, policy, start, steps):
+    sim_v2.reset_stats()
+    sim_v2.reset(start=int(start), max_steps=steps)
+    first = sim_v2.pos
+    rows = []
+    cum = 0.0
+    while not sim_v2.done:
+        pos = sim_v2.pos
+        d, f, r = policy(sim_v2)
+        s0 = (sim_v2.s["damage"], sim_v2.s["disruption"], sim_v2.s["dropped"])
+        true = sim_v2.apply(d, f, r)[4]
+        dmg = sim_v2.s["damage"] - s0[0]
+        cum += dmg
+        rows.append(
+            {
+                "flow": pos - first,
+                "true": CLASSES[true],
+                "detection": CLASSES[d],
+                "firewall": FIREWALL_ACTIONS[f],
+                "response": RESPONSE_ACTIONS[r],
+                "damage": round(dmg, 2),
+                "benign disruption": round(sim_v2.s["disruption"] - s0[1], 2),
+                "attacker flows dropped after": sim_v2.s["dropped"] - s0[2],
+                "cumulative damage": cum,
+            }
+        )
+    stats = dict(sim_v2.s)
+    stats["uncontained"] += sim_v2.open_onsets()
+    return pd.DataFrame(rows), stats
+
+
+with tab_v2:
+    st.subheader("v2: agents trained by interacting with a simulator that reacts to their actions")
+    st.markdown(
+        """
+In v1 the recorded traffic is replayed independently of what the agents do. In **v2** the
+traffic is still recorded, but the agents' actions change what happens next:
+
+- **Block / Isolate** an attack flow -> that attacker's later flows are dropped until the block expires.
+- **Rate-limit** -> the attacker is throttled (less damage per flow).
+- **Alert** -> an analyst contains the attacker after a delay (cheap but slow).
+- **Letting an attack through** -> damage that grows the longer the attack runs, so speed matters.
+- **Blocking/isolating benign traffic** -> service disruption (isolation causes a short outage).
+
+The agents get a reward from these *outcomes* (plus a small label-based shaping term) and
+learn with PPO. They never see the labels; only the simulator uses them to compute outcomes.
+"""
+    )
+
+    st.markdown("#### Closed-loop results on the held-out test stream")
+    sim_path = f"{OUTPUTS_DIR}/eval_sim_summary.json"
+    if os.path.exists(sim_path):
+        with open(sim_path) as f:
+            sim_summary = json.load(f)
+        names = {
+            "none": "No defense",
+            "rule": "Rule-based",
+            "v1_marl": "v1 MARL (offline-trained)",
+            "v2_marl": "v2 MARL (interactive RL)",
+            "v2_single": "v2 single-agent",
+        }
+        rows = []
+        for key, label in names.items():
+            if key in sim_summary:
+                r = sim_summary[key]
+                rows.append(
+                    {
+                        "System": label,
+                        "Total loss (lower=better)": r["total_loss"],
+                        "Attack damage": r["damage"],
+                        "Benign disruption": r["disruption"],
+                        "Damage reduction": r["damage_reduction"],
+                        "Benign flows disrupted": r["benign_disrupted_rate"],
+                        "Mean latency (flows)": r["mean_latency_flows"] if r["mean_latency_flows"] is not None else float("nan"),
+                    }
+                )
+        res_df = pd.DataFrame(rows).set_index("System")
+        st.dataframe(
+            res_df.style.format(
+                {
+                    "Total loss (lower=better)": "{:,.0f}",
+                    "Attack damage": "{:,.0f}",
+                    "Benign disruption": "{:,.0f}",
+                    "Damage reduction": "{:.1%}",
+                    "Benign flows disrupted": "{:.2%}",
+                    "Mean latency (flows)": "{:.1f}",
+                },
+                na_rep="n/a",
+            ),
+            use_container_width=True,
+        )
+        loss_img = f"{OUTPUTS_DIR}/eval_sim_loss.png"
+        if os.path.exists(loss_img):
+            st.image(loss_img, caption="Total loss on the test stream, split into damage / disruption / cost")
+        zoom = res_df.loc[[n for n in res_df.index if "MARL" in n], ["Attack damage", "Benign disruption"]]
+        st.markdown("**Zoomed in: v1 vs v2 3-agent systems only:**")
+        st.bar_chart(zoom)
+        st.caption(
+            "Caveats: the single-agent baseline had less training than the 3-agent system; the "
+            "BruteForce fix was diagnosed on this same test stream (no separate validation split); "
+            "one seed; attackers are identified by attack class in the simulator (no Source IP in the data)."
+        )
+    else:
+        st.warning("Run `python -m src.evaluate_sim` first to generate outputs/eval_sim_summary.json")
+
+    st.markdown("#### Watch an attack get contained")
+    sim_v2, policies = load_v2()
+    c1, c2, c3, c4 = st.columns(4)
+    attack_cls = c1.selectbox("Attack type", ["DDoS", "PortScan", "BruteForce"], index=2)
+    burst = c2.slider("Which attack burst in the test stream", 0, 100, 10)
+    n_steps = c3.slider("Flows to simulate", 100, 1500, 400, step=50)
+    system_label = c4.selectbox("System", list(policies.keys()), index=list(policies.keys()).index("v2 MARL (interactive RL)") if "v2 MARL (interactive RL)" in policies else 0)
+
+    cls_idx = {"DDoS": 0, "PortScan": 1, "BruteForce": 2}[attack_cls]
+    idxs = sim_v2._attack_idx[cls_idx]
+    anchor = int(idxs[int(burst / 100 * (len(idxs) - 1))])
+    start = max(int(sim_v2.file_start[anchor]), anchor - 30)
+
+    chosen_df, chosen_stats = simulate_window(sim_v2, policies[system_label], start, n_steps)
+    base_df, base_stats = simulate_window(sim_v2, policy_none, start, n_steps)
+
+    lat = chosen_stats["latencies"]
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Attack damage", f"{chosen_stats['damage']:.0f}", f"{chosen_stats['damage'] - base_stats['damage']:+.0f} vs no defense", delta_color="inverse")
+    m2.metric("Benign traffic disrupted", int(chosen_stats["benign_disrupted"]))
+    m3.metric("Time to first containment", f"{lat[0]} flows" if lat else "not contained")
+    m4.metric("Attacker flows dropped", int(chosen_stats["dropped"]))
+
+    span = int(max(chosen_df["flow"].max(), base_df["flow"].max())) + 1
+    series = {"No defense": base_df.set_index("flow")["cumulative damage"]}
+    if system_label != "No defense":
+        series = {system_label: chosen_df.set_index("flow")["cumulative damage"], **series}
+    curve = pd.concat(series, axis=1).reindex(range(span)).ffill().fillna(0.0)
+    st.line_chart(curve, color=["#2ecc71", "#e74c3c"][: len(curve.columns)] if len(curve.columns) == 2 else ["#e74c3c"])
+    st.caption("Cumulative attack damage over the simulated stretch of traffic. A flat line means the attacker is contained.")
+
+    notable = st.checkbox("Show only notable flows (attacks, non-trivial actions, damage, disruption)", value=True)
+    log = chosen_df.drop(columns=["cumulative damage"])
+    if notable:
+        mask = (
+            (log["true"] != "BENIGN")
+            | (log["firewall"] != "Allow")
+            | (log["response"] != "No action")
+            | (log["damage"] > 0)
+            | (log["benign disruption"] > 0)
+        )
+        log = log[mask]
+    st.dataframe(log.head(200), use_container_width=True, hide_index=True)
+
+    with st.expander("v2 training reward curves"):
+        sim_curves = {}
+        for key, label in (("sim_detection", "detection"), ("sim_firewall", "firewall"), ("sim_response", "response"), ("sim_single_agent", "single-agent")):
+            p = f"{OUTPUTS_DIR}/{key}_reward_curve.json"
+            if os.path.exists(p):
+                with open(p) as f:
+                    sim_curves[label] = pd.Series(json.load(f))
+        if sim_curves:
+            cdf = pd.DataFrame(sim_curves)
+            st.line_chart(cdf.rolling(max(1, len(cdf) // 30), min_periods=1).mean())
+            st.caption("Episode reward per agent, smoothed (rounds are concatenated; later rounds train against learned partners).")
+        else:
+            st.info("No v2 reward curves found.")
 
 with tab_overview:
     st.subheader("System comparison on held-out (chronologically later) test traffic")

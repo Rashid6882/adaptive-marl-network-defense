@@ -44,6 +44,39 @@ Outputs land in `outputs/`: reward curves (`reward_curves.png`), a detection
 F1 comparison chart (`detection_f1_comparison.png`), and a full metrics dump
 (`eval_summary.json`). Trained models land in `models/`.
 
+## v2: interactive closed-loop training (`src/sim_env.py`)
+
+v1 replays recorded flows independently of the agents' actions (each step's
+reward depends only on that step). v2 keeps the recorded trace but makes
+actions change what happens next: Block/Isolate contains an attacker (its later
+flows are dropped until a TTL expires), Rate-limit throttles it, Alert triggers
+a delayed analyst containment, uncontained attacks cause escalating damage,
+and isolating a benign host causes an outage. Rewards are outcome-based
+(damage, disruption, cost) shared by all agents plus a small role-specific
+shaping term. Labels are used only by the simulator, never observed.
+
+```bash
+# round 0 (rule-based partners are used until a partner model exists)
+python -m src.train_sim --role detection --steps 300000 --fresh
+python -m src.train_sim --role firewall  --steps 200000 --fresh
+python -m src.train_sim --role response  --steps 150000 --fresh
+# round 1+ (warm-starts; each agent trains against the others' learned policies)
+python -m src.train_sim --role detection --steps 250000
+python -m src.train_sim --role firewall  --steps 150000
+python -m src.train_sim --role response  --steps 150000
+# BruteForce fix: v2 Detection was fine, but Firewall let ~94% of BruteForce through
+# (rare in its training episodes). Two extra Firewall passes with more BruteForce exposure:
+python -m src.train_sim --role firewall --steps 250000 --bf-anchor 0.6
+python -m src.train_sim --role firewall --steps 200000 --bf-anchor 0.7
+python -m src.train_sim --role single --steps 400000 --fresh   # baseline
+python -m src.evaluate_sim
+```
+
+Assumptions: the attacker is identified by attack class within an episode (no
+Source IP in this CSV release), and dropping flows after a block is a modeling
+assumption, not a live network. Closed-loop results are in
+`outputs/eval_sim_summary.json`.
+
 ## Design notes
 
 - **Sequential conditioning**: each flow is one timestep. Detection acts
