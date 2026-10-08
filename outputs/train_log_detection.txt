@@ -1,0 +1,9 @@
+2026-10-03 13:57:35.302168: I tensorflow/core/util/port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+2026-10-03 13:57:38.765665: I tensorflow/core/util/port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+Loading and cleaning dataset...
+Train rows: 686786  Test rows: 171699
+
+=== Training Detection agent ===
+[detection] trained for 300000 steps, 147 episodes, last 10-episode mean reward = 2676.240
+
+All agents trained and saved to models/. Reward curves saved to outputs/.

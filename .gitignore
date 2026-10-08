@@ -1,0 +1,7 @@
+DATASET/
+outputs/_clean_cache.pkl
+__pycache__/
+*.pyc
+~$*
+.claude/
+*.pptx

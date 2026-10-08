@@ -1,0 +1,57 @@
+2026-10-03 14:17:00.269089: I tensorflow/core/util/port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+2026-10-03 14:17:06.041955: I tensorflow/core/util/port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+Loading dataset and trained models...
+C:\Users\rashi\AppData\Local\Programs\Python\Python311\Lib\site-packages\stable_baselines3\common\on_policy_algorithm.py:150: UserWarning: You are trying to run PPO on the GPU, but it is primarily intended to run on the CPU when not using a CNN policy (you are using ActorCriticPolicy which should be a MlpPolicy). See https://github.com/DLR-RM/stable-baselines3/issues/1245 for more info. You can pass `device='cpu'` or `export CUDA_VISIBLE_DEVICES=` to force using the CPU.Note: The model will train, but the GPU utilization will be poor and the training might take longer than on CPU.
+  warnings.warn(
+Running MARL system on test split...
+Running rule-based baseline on test split...
+Running single-agent RL baseline on test split...
+C:\Users\rashi\AppData\Local\Programs\Python\Python311\Lib\site-packages\stable_baselines3\common\on_policy_algorithm.py:150: UserWarning: You are trying to run PPO on the GPU, but it is primarily intended to run on the CPU when not using a CNN policy (you are using ActorCriticPolicy which should be a MlpPolicy). See https://github.com/DLR-RM/stable-baselines3/issues/1245 for more info. You can pass `device='cpu'` or `export CUDA_VISIBLE_DEVICES=` to force using the CPU.Note: The model will train, but the GPU utilization will be poor and the training might take longer than on CPU.
+  warnings.warn(
+
+--- Detection metrics [3-agent MARL] ---
+Overall accuracy: 0.9901   Macro F1: 0.9218
+  BENIGN       F1 = 0.9946
+  DDoS         F1 = 0.9645
+  PortScan     F1 = 0.9797
+  BruteForce   F1 = 0.7486
+
+--- Detection metrics [Rule-based baseline] ---
+Overall accuracy: 0.8725   Macro F1: 0.2330
+  BENIGN       F1 = 0.9319
+  DDoS         F1 = 0.0000
+  PortScan     F1 = 0.0000
+  BruteForce   F1 = 0.0000
+
+--- Detection metrics [Single-agent RL] ---
+Overall accuracy: 0.8699   Macro F1: 0.5299
+  BENIGN       F1 = 0.9263
+  DDoS         F1 = 0.5651
+  PortScan     F1 = 0.5619
+  BruteForce   F1 = 0.0661
+
+Firewall false positive rate (benign flows rate-limited/blocked):
+  MARL: 0.0089   Rule-based: 0.0027   Single-agent: 0.1007
+
+Coordination benefit (MARL macro F1 - single-agent macro F1): +0.3920
+Saved outputs/reward_curves.png
+Saved outputs/detection_f1_comparison.png
+
+=== Sample episode playback (flows 15322..15336) ===
+  flow   15322 | true=BENIGN     | Detection=BENIGN     [OK] -> Firewall=Allow      -> Response=No action
+  flow   15323 | true=BENIGN     | Detection=BENIGN     [OK] -> Firewall=Allow      -> Response=No action
+  flow   15324 | true=BENIGN     | Detection=BENIGN     [OK] -> Firewall=Allow      -> Response=No action
+  flow   15325 | true=BENIGN     | Detection=BENIGN     [OK] -> Firewall=Allow      -> Response=No action
+  flow   15326 | true=BENIGN     | Detection=BENIGN     [OK] -> Firewall=Allow      -> Response=No action
+  flow   15327 | true=BENIGN     | Detection=BENIGN     [OK] -> Firewall=Allow      -> Response=No action
+  flow   15328 | true=BENIGN     | Detection=BENIGN     [OK] -> Firewall=Allow      -> Response=No action
+  flow   15329 | true=BENIGN     | Detection=BENIGN     [OK] -> Firewall=Allow      -> Response=No action
+  flow   15330 | true=BENIGN     | Detection=BENIGN     [OK] -> Firewall=Allow      -> Response=No action
+  flow   15331 | true=BENIGN     | Detection=BENIGN     [OK] -> Firewall=Allow      -> Response=No action
+  flow   15332 | true=BENIGN     | Detection=BENIGN     [OK] -> Firewall=Allow      -> Response=No action
+  flow   15333 | true=BENIGN     | Detection=BENIGN     [OK] -> Firewall=Allow      -> Response=No action
+  flow   15334 | true=BENIGN     | Detection=BENIGN     [OK] -> Firewall=Allow      -> Response=No action
+  flow   15335 | true=BENIGN     | Detection=BENIGN     [OK] -> Firewall=Allow      -> Response=No action
+  flow   15336 | true=BENIGN     | Detection=BENIGN     [OK] -> Firewall=Allow      -> Response=No action
+
+Saved outputs/eval_summary.json

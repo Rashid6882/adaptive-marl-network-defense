@@ -1,0 +1,36 @@
+{
+  "marl": {
+    "accuracy": 0.9226029272156506,
+    "macro_f1": 0.47706796310471916,
+    "per_class_f1": {
+      "BENIGN": 0.9566606972457876,
+      "DDoS": 0.8953745332622114,
+      "PortScan": 0.0562366219108776,
+      "BruteForce": 0.0
+    },
+    "firewall_fpr": 0.053321084794504134
+  },
+  "rule_based": {
+    "accuracy": 0.8725210979679555,
+    "macro_f1": 0.23298031165438088,
+    "per_class_f1": {
+      "BENIGN": 0.9319212466175235,
+      "DDoS": 0.0,
+      "PortScan": 0.0,
+      "BruteForce": 0.0
+    },
+    "firewall_fpr": 0.0027359507928266164
+  },
+  "single_agent": {
+    "accuracy": 0.8513852730650732,
+    "macro_f1": 0.5365344534265242,
+    "per_class_f1": {
+      "BENIGN": 0.9106778598628266,
+      "DDoS": 0.7206119898814421,
+      "PortScan": 0.514847963961828,
+      "BruteForce": 0.0
+    },
+    "firewall_fpr": 0.1618671033537032
+  },
+  "coordination_benefit_macro_f1": -0.05946649032180501
+}

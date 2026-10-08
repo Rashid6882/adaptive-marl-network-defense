@@ -1,0 +1,10 @@
+pandas
+numpy
+scikit-learn
+matplotlib
+gymnasium
+pettingzoo
+stable-baselines3[extra]
+shap
+joblib
+streamlit
