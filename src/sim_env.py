@@ -1,10 +1,10 @@
 """
-Closed-loop, trace-driven network-defense simulator (v2).
+Closed-loop, trace-driven network-defense simulator.
 
-The v1 environments replay recorded flows independently of what the agents do,
-so each step's reward depends only on that step (a contextual bandit). Here the
-recorded trace is still the source of traffic, but the agents' actions change
-what happens next:
+Replaying recorded flows independently of what the agents do would make each
+step's reward depend only on that step (a contextual bandit). Here the recorded
+trace is still the source of traffic, but the agents' actions change what
+happens next:
 
   - Block / Isolate on an attack flow contains that attacker (identified by its
     attack class within the episode, since this CSV release has no Source IP):
@@ -16,7 +16,7 @@ what happens next:
   - Isolating a benign host causes an outage that disrupts the next benign flows.
 
 Rewards are outcome-based (damage, disruption, operating cost) shared by all
-three agents, plus a small role-specific shaping term (the v1 reward tables),
+three agents, plus a small role-specific shaping term (the reward tables in features.py),
 so Detection - whose output is only a message to Firewall - still gets signal.
 Ground-truth labels are used only by the simulator to compute outcomes; the
 agents never observe them.
@@ -96,8 +96,32 @@ def load_split_cached():
     return tr, te
 
 
-def rule_detect_array(df):
-    """Vectorized equivalent of baseline_rule.rule_based_detect (DDoS > PortScan > BruteForce)."""
+def load_splits_cached(val_share=0.125):
+    """Chronological train / validation / test: per file, the first 70% / next 10% / last 20%.
+    The test part is identical to load_split_cached()'s test split; validation is carved
+    from the end of its training part so tuning never touches test flows."""
+    tr, te = load_split_cached()
+    keep, val = [], []
+    for _, g in tr.groupby("source_file", sort=False):
+        cut = int(len(g) * (1 - val_share))
+        keep.append(g.iloc[:cut])
+        val.append(g.iloc[cut:])
+    return (
+        pd.concat(keep, axis=0).reset_index(drop=True),
+        pd.concat(val, axis=0).reset_index(drop=True),
+        te,
+    )
+
+
+DEFAULT_RULE_PARAMS = dict(
+    ddos_pkt=2000.0, ddos_fwd=10, ps_dur=1000.0, ps_rep=10, bf_rep=5, bf_dur=2_000_000.0, resp_thr=5,
+)
+
+
+def rule_detect_array(df, params=None):
+    """Vectorized equivalent of baseline_rule.rule_based_detect (DDoS > PortScan > BruteForce).
+    `params` overrides the default thresholds (used to tune the rule baseline)."""
+    p = {**DEFAULT_RULE_PARAMS, **(params or {})}
     pkt = df["Flow Packets/s"].values
     dur = df["Flow Duration"].values
     syn = df["SYN Flag Count"].values
@@ -105,9 +129,9 @@ def rule_detect_array(df):
     rep = df["dport_repeat_count"].values
     fwd = df["Total Fwd Packets"].values
     out = np.zeros(len(df), dtype=np.int64)
-    out[np.isin(dport, (21, 22)) & (rep >= 5) & (dur < 2_000_000)] = 3
-    out[(syn >= 1) & (dur < 1000) & (rep >= 10)] = 2
-    out[(pkt > 2000) & (fwd > 10)] = 1
+    out[np.isin(dport, (21, 22)) & (rep >= p["bf_rep"]) & (dur < p["bf_dur"])] = 3
+    out[(syn >= 1) & (dur < p["ps_dur"]) & (rep >= p["ps_rep"])] = 2
+    out[(pkt > p["ddos_pkt"]) & (fwd > p["ddos_fwd"])] = 1
     return out
 
 
@@ -304,6 +328,38 @@ class DefenseSim:
         self.pos += 1
         self._settle()
         return outcome, shape_det, shape_fw, shape_resp, true
+
+    def preview(self, det_a, fw_a, resp_a):
+        """Immediate (damage, disruption, cost) of a joint action on the current flow,
+        without changing any simulator state. Used for counterfactual analysis."""
+        c = self.cfg
+        pos = self.pos
+        true = int(self.labels[pos])
+        damage = disruption = cost = 0.0
+        if true != 0:
+            base = c.damage_base[true] * (1.0 + min(self.age[true] / c.age_scale, c.age_cap))
+            factor = c.throttle_factor if self.throttle_until[true] > pos else 1.0
+            if fw_a == 2 or resp_a == 2:
+                factor = 0.0
+            elif fw_a == 1:
+                factor = min(factor, c.throttle_factor)
+            damage = base * factor
+        else:
+            if fw_a == 2:
+                disruption += c.disruption_block
+            elif fw_a == 1:
+                disruption += c.disruption_rl
+            if resp_a == 2:
+                disruption += c.disruption_isolate
+            elif self.outage_left > 0:
+                disruption += c.outage_cost
+            if resp_a == 1:
+                cost += c.false_alert_cost
+        if resp_a == 1:
+            cost += c.alert_cost
+        elif resp_a == 2:
+            cost += c.isolate_cost
+        return damage, disruption, cost
 
 
 # ---- observation builders (shared by training envs and evaluation) --------

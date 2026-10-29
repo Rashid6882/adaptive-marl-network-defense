@@ -1,0 +1,11 @@
+{
+  "reference": 10.656944444444445,
+  "results": [
+    {
+      "steps": 0,
+      "shifted_loss": 44.01041666666665,
+      "general_loss": 7.108333333333334
+    }
+  ],
+  "steps_to_90pct": null
+}

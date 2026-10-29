@@ -1,0 +1,14 @@
+{
+  "params": {
+    "ddos_pkt": 198.9524706237367,
+    "ddos_fwd": 2,
+    "ps_dur": 331.56201950257156,
+    "ps_rep": 31,
+    "bf_rep": 16,
+    "bf_dur": 5162565.577221881,
+    "resp_thr": 5
+  },
+  "val_loss": 22349.499999999953,
+  "default_val_loss": 76840.4,
+  "trials": 1200
+}

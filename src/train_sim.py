@@ -9,6 +9,10 @@ A partner whose model isn't saved yet falls back to the rule-based policy.
 
     python -m src.train_sim --role detection --steps 150000
     python -m src.train_sim --role single --steps 200000     # single-agent baseline
+
+Experiment protocol (multiple seeds, validation split):
+    python -m src.train_sim --role detection --steps 300000 --fresh \
+        --use-val-split --seed-id 1 --models-dir runs/seed1 --bf-anchor 0.5
 """
 
 import argparse
@@ -24,7 +28,8 @@ from stable_baselines3.common.monitor import Monitor
 
 from src.env import fit_scaler
 from src.sim_env import (
-    ROLE_IDX, RoleEnv, SimConfig, SingleSimEnv, load_split_cached, make_fast_predict,
+    ROLE_IDX, RoleEnv, SimConfig, SingleSimEnv, load_split_cached, load_splits_cached,
+    make_fast_predict,
 )
 
 MODELS_DIR = "models_v2"
@@ -45,8 +50,8 @@ class RewardCurve(BaseCallback):
         return True
 
 
-def load_partner(name):
-    path = f"{MODELS_DIR}/{name}.zip"
+def load_partner(models_dir, name):
+    path = f"{models_dir}/{name}.zip"
     if os.path.exists(path):
         return make_fast_predict(PPO.load(path, device="cpu"))
     return None
@@ -61,17 +66,29 @@ def main():
         "--bf-anchor", type=float, default=None,
         help="share of attack-anchored training episodes that start on BruteForce (rest split evenly)",
     )
+    ap.add_argument("--models-dir", default=MODELS_DIR, help="where models, scaler and reward curves are stored")
+    ap.add_argument("--seed-id", type=int, default=0, help="independent training run id (shifts all RNG seeds)")
+    ap.add_argument(
+        "--use-val-split", action="store_true",
+        help="train only on the first 70%% of each file (validation and test stay unseen)",
+    )
     args = ap.parse_args()
+    models_dir = args.models_dir
     cfg = None
     if args.bf_anchor is not None:
         rest = (1.0 - args.bf_anchor) / 2.0
         cfg = SimConfig(anchor_class_probs=(rest, rest, args.bf_anchor))
 
-    train_df, _ = load_split_cached()
-    scaler_path = "models/scaler.joblib"
-    scaler = joblib.load(scaler_path) if os.path.exists(scaler_path) else fit_scaler(train_df)
+    train_df = load_splits_cached()[0] if args.use_val_split else load_split_cached()[0]
+    scaler_path = f"{models_dir}/scaler.joblib"
+    os.makedirs(models_dir, exist_ok=True)
+    if os.path.exists(scaler_path):
+        scaler = joblib.load(scaler_path)
+    else:
+        scaler = fit_scaler(train_df)
+        joblib.dump(scaler, scaler_path)
 
-    seed = SEEDS[args.role]
+    seed = SEEDS[args.role] + 1000 * args.seed_id
     if args.role == "single":
         env = SingleSimEnv(train_df, scaler, cfg=cfg, seed=seed)
         name = "single_agent"
@@ -79,14 +96,13 @@ def main():
         partners = {"det": None, "fw": None, "resp": None}
         for key, partner_name in (("det", "detection"), ("fw", "firewall"), ("resp", "response")):
             if partner_name != args.role:
-                partners[key] = load_partner(partner_name)
+                partners[key] = load_partner(models_dir, partner_name)
         print("partners:", {k: ("learned" if v else "rule-based") for k, v in partners.items()}, flush=True)
         env = RoleEnv(train_df, scaler, ROLE_IDX[args.role], partners, cfg=cfg, seed=seed)
         name = args.role
 
     env = Monitor(env)
-    os.makedirs(MODELS_DIR, exist_ok=True)
-    path = f"{MODELS_DIR}/{name}.zip"
+    path = f"{models_dir}/{name}.zip"
     if os.path.exists(path) and not args.fresh:
         print("warm-starting from", path, flush=True)
         model = PPO.load(path, env=env, device="cpu")
@@ -104,7 +120,8 @@ def main():
     dt = time.time() - t0
     model.save(path)
 
-    curve_path = f"{OUTPUTS_DIR}/sim_{name}_reward_curve.json"
+    curve_dir = OUTPUTS_DIR if models_dir == MODELS_DIR else models_dir
+    curve_path = f"{curve_dir}/sim_{name}_reward_curve.json"
     prev = json.load(open(curve_path)) if (os.path.exists(curve_path) and not args.fresh) else []
     with open(curve_path, "w") as f:
         json.dump(prev + cb.rewards, f)

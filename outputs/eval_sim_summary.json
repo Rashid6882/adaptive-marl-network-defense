@@ -37,25 +37,6 @@
     },
     "damage_reduction": 0.0
   },
-  "v1_marl": {
-    "damage": 121.36666666666677,
-    "disruption": 1337.0,
-    "operating_cost": 220.6500000000061,
-    "total_loss": 1679.0166666666728,
-    "benign_disrupted_rate": 0.008900161094912862,
-    "containment_events": 402,
-    "uncontained_attacks": 5,
-    "mean_latency_flows": 1.7537313432835822,
-    "attack_flows_dropped": 20952,
-    "detection_macro_f1": 0.5196208557307076,
-    "detection_f1": {
-      "BENIGN": 0.9951208100792033,
-      "DDoS": 0.12964930924548354,
-      "PortScan": 0.41605839416058393,
-      "BruteForce": 0.5376549094375596
-    },
-    "damage_reduction": 0.9976731627667699
-  },
   "v2_marl": {
     "damage": 181.89166666666694,
     "disruption": 173.3,

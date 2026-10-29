@@ -1,0 +1,26 @@
+{
+  "reference": 16.071458333333336,
+  "results": [
+    {
+      "steps": 0,
+      "shifted_loss": 101.03958333333333,
+      "general_loss": 7.693333333333333
+    },
+    {
+      "steps": 25000,
+      "shifted_loss": 93.82291666666667,
+      "general_loss": 9.214166666666669
+    },
+    {
+      "steps": 50000,
+      "shifted_loss": 100.81041666666667,
+      "general_loss": 7.44125
+    },
+    {
+      "steps": 100000,
+      "shifted_loss": 100.28333333333333,
+      "general_loss": 7.762708333333333
+    }
+  ],
+  "steps_to_90pct": null
+}
