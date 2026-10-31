@@ -2,43 +2,43 @@
  "seed": "3",
  "detection": {
   "DDoS": {
-   "flows": 175,
-   "exact_class_recall": 0.0,
-   "flagged_as_any_attack": 0.34857142857142853,
-   "precision": 0.0
+   "flows": 119,
+   "exact_class_recall": 0.20168067226890757,
+   "flagged_as_any_attack": 0.5546218487394958,
+   "precision": 1.0
   },
   "PortScan": {
-   "flows": 157,
-   "exact_class_recall": 0.35668789808917195,
-   "flagged_as_any_attack": 0.36305732484076436,
+   "flows": 127,
+   "exact_class_recall": 0.4409448818897638,
+   "flagged_as_any_attack": 0.45669291338582674,
    "precision": 0.9491525423728814
   },
   "BruteForce": {
    "flows": 297,
    "exact_class_recall": 0.9225589225589226,
    "flagged_as_any_attack": 0.9225589225589226,
-   "precision": 0.8154761904761905
+   "precision": 0.845679012345679
   },
   "BENIGN": {
    "flows": 150222,
-   "false_alarm_rate": 1.9970443743244637e-05
+   "false_alarm_rate": 5.991133122973391e-05
   }
  },
  "firewall": {
-  "block_rate_on_attack_flows": 0.6200317965023847,
-  "block_rate_on_benign_flows": 1.9970443743259975e-05,
-  "block_rate_when_verdict_is_attack": 0.9949367088607595,
+  "block_rate_on_attack_flows": 0.7237569060773481,
+  "block_rate_on_benign_flows": 5.991133122977993e-05,
+  "block_rate_when_verdict_is_attack": 0.9877149877149877,
   "block_rate_when_verdict_benign_but_flow_is_attack": 0.0
  },
  "response": {
   "attack_flows": {
-   "No action": 0.3783783783783784,
-   "Alert": 0.6216216216216216,
+   "No action": 0.27624309392265195,
+   "Alert": 0.7237569060773481,
    "Isolate": 0.0
   },
   "benign_flows": {
-   "No action": 0.9999800295562568,
-   "Alert": 1.9970443743259975e-05,
+   "No action": 0.9999400886687703,
+   "Alert": 5.991133122977993e-05,
    "Isolate": 0.0
   }
  }

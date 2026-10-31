@@ -9,7 +9,7 @@ file by file, and its own actions change which flows it sees next. Systems:
   v2_marl     - the 3 agents trained interactively in the simulator
   v2_single   - single-agent baseline trained in the simulator
 
-    python -m src.evaluate_sim                                   # legacy: models_v2/, test split
+    python -m src.evaluate_sim                                   # default: runs/seed1, test split
     python -m src.evaluate_sim --models-dir runs/seed1 --split val --out runs/seed1/eval_val.json
     python -m src.evaluate_sim --models-dir runs/seed1 --split test --out runs/seed1/eval_test.json \
         --tuned-rule runs/tuned_rule.json
@@ -48,7 +48,7 @@ from src.sim_env import (
 )
 from src.single_agent_env import decode_action
 
-V2_DIR = "models_v2"
+V2_DIR = "runs/seed1"
 OUTPUTS_DIR = "outputs"
 
 SENSITIVITY_VARIANTS = {

@@ -44,7 +44,7 @@ def perturb(p, rng):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
-    ap.add_argument("--models-dir", default="models_v2", help="only used to find a feature scaler")
+    ap.add_argument("--models-dir", default="runs/seed1", help="only used to find a feature scaler")
     ap.add_argument("--trials", type=int, default=1200)
     ap.add_argument("--max-minutes", type=float, default=8.0)
     ap.add_argument("--seed", type=int, default=0)

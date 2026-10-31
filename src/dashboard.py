@@ -145,22 +145,23 @@ The agents are rewarded on these outcomes and learn with PPO. They never see the
 with tab_rl:
     st.subheader("Agents trained by interacting with a simulator that reacts to their actions")
 
-    st.markdown("#### Closed-loop results on the held-out test stream")
-    sim_path = f"{OUTPUTS_DIR}/eval_sim_summary.json"
+    st.markdown("#### Closed-loop results on the held-out test stream (mean of 4 seeds)")
+    sim_path = "runs/summary_test.json"
     if os.path.exists(sim_path):
         with open(sim_path) as f:
             sim_summary = json.load(f)
         names = {
             "none": "No defense",
             "rule": "Rule-based",
+            "rule_tuned": "Rule-based (tuned)",
             "v2_marl": "3-agent MARL (interactive RL)",
             "v2_single": "Single-agent RL",
         }
         rows = []
         for key, label in names.items():
             if key in sim_summary:
-                r = sim_summary[key]
-                lat = r["mean_latency_flows"]
+                r = {metric: v["mean"] if v else None for metric, v in sim_summary[key].items()}
+                lat = r.get("mean_latency_flows")
                 rows.append(
                     {
                         "System": label,
@@ -191,12 +192,13 @@ with tab_rl:
         if os.path.exists(loss_img):
             st.image(loss_img, caption="Total loss on the test stream, split into damage / disruption / cost")
         st.caption(
-            "Caveats: the single-agent baseline had less training than the 3-agent system; the "
-            "BruteForce fix was diagnosed on this same test stream (no separate validation split); "
-            "one seed; attackers are identified by attack class in the simulator (no Source IP in the data)."
+            "Both learned systems had the same 1.2M-step budget, 4 seeds each. MARL and the single agent "
+            "are statistically tied on this stream (see README for per-seed numbers and the std). "
+            "Attackers are identified by attack class in the simulator (no Source IP in the data). "
+            "The demo below uses the seed-1 models."
         )
     else:
-        st.warning("Run `python -m src.evaluate_sim` first to generate outputs/eval_sim_summary.json")
+        st.warning("Run the evaluation first (see README) to generate runs/summary_test.json")
 
     st.markdown("#### Watch an attack get contained")
     sim, policies = load_sim()
@@ -248,7 +250,7 @@ with tab_rl:
     with st.expander("Training reward curves"):
         sim_curves = {}
         for key, label in (("sim_detection", "detection"), ("sim_firewall", "firewall"), ("sim_response", "response"), ("sim_single_agent", "single-agent")):
-            p = f"{OUTPUTS_DIR}/{key}_reward_curve.json"
+            p = f"{V2_DIR}/{key}_reward_curve.json"
             if os.path.exists(p):
                 with open(p) as f:
                     sim_curves[label] = pd.Series(json.load(f))

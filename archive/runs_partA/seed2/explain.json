@@ -1,0 +1,22 @@
+{
+  "harmful_steps": 5159,
+  "exactly_one_agent": 0,
+  "root_cause_counts": {
+    "Detection": 3476,
+    "Firewall": 1683
+  },
+  "shap_shares_by_root_cause": {
+    "Detection": {
+      "Detection verdict": 0.7165202494013011,
+      "repeat count": 0.1562844591272624,
+      "packet rate": 0.09840804343324298,
+      "context": 0.028787248038193537
+    },
+    "Firewall": {
+      "Detection verdict": 0.4740233908879672,
+      "repeat count": 0.35881979393843494,
+      "packet rate": 0.030097335693483232,
+      "context": 0.13705947948011477
+    }
+  }
+}

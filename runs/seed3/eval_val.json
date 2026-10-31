@@ -57,41 +57,41 @@
     "damage_reduction": 0.7955455681379578
   },
   "v2_marl": {
-    "damage": 115.60000000000001,
-    "disruption": 1.0,
-    "operating_cost": 16.550000000000097,
-    "total_loss": 133.1500000000001,
-    "benign_disrupted_rate": 1.9751135690302193e-05,
+    "damage": 112.18333333333328,
+    "disruption": 2.0,
+    "operating_cost": 16.700000000000102,
+    "total_loss": 130.88333333333338,
+    "benign_disrupted_rate": 3.9502271380604385e-05,
     "containment_events": 328,
     "uncontained_attacks": 0,
-    "mean_latency_flows": 2.847560975609756,
-    "attack_flows_dropped": 34769,
-    "detection_macro_f1": 0.6610562767237627,
+    "mean_latency_flows": 2.667682926829268,
+    "attack_flows_dropped": 34787,
+    "detection_macro_f1": 0.7696148043320022,
     "detection_f1": {
-      "BENIGN": 0.9987769031978063,
-      "DDoS": 0.0,
-      "PortScan": 0.8688524590163934,
-      "BruteForce": 0.776595744680851
+      "BENIGN": 0.9990133785863688,
+      "DDoS": 0.29591836734693877,
+      "PortScan": 0.963302752293578,
+      "BruteForce": 0.8202247191011236
     },
-    "damage_reduction": 0.9984874950117428
+    "damage_reduction": 0.9985321985184604
   },
   "v2_single": {
-    "damage": 6817.75,
-    "disruption": 1976.0999999999997,
-    "operating_cost": 119.69999999999925,
-    "total_loss": 8913.55,
-    "benign_disrupted_rate": 0.03569030219237606,
-    "containment_events": 96,
-    "uncontained_attacks": 12,
-    "mean_latency_flows": 203.90625,
-    "attack_flows_dropped": 32552,
-    "detection_macro_f1": 0.2963295126609116,
+    "damage": 133.12500000000003,
+    "disruption": 0.0,
+    "operating_cost": 30.500000000000075,
+    "total_loss": 163.6250000000001,
+    "benign_disrupted_rate": 0.0,
+    "containment_events": 239,
+    "uncontained_attacks": 0,
+    "mean_latency_flows": 4.03765690376569,
+    "attack_flows_dropped": 34823,
+    "detection_macro_f1": 0.5858381256680897,
     "detection_f1": {
-      "BENIGN": 0.9712242728766064,
-      "DDoS": 0.0027434842249657062,
-      "PortScan": 0.21135029354207435,
-      "BruteForce": 0.0
+      "BENIGN": 0.998826186882885,
+      "DDoS": 0.0,
+      "PortScan": 0.384,
+      "BruteForce": 0.9605263157894737
     },
-    "damage_reduction": 0.9107968781687699
+    "damage_reduction": 0.9982581987321649
   }
 }

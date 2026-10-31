@@ -1,0 +1,45 @@
+{
+ "seed": "4",
+ "detection": {
+  "DDoS": {
+   "flows": 118,
+   "exact_class_recall": 0.01694915254237288,
+   "flagged_as_any_attack": 0.0423728813559322,
+   "precision": 0.011627906976744186
+  },
+  "PortScan": {
+   "flows": 213,
+   "exact_class_recall": 0.15023474178403756,
+   "flagged_as_any_attack": 0.15492957746478875,
+   "precision": 0.256
+  },
+  "BruteForce": {
+   "flows": 296,
+   "exact_class_recall": 0.9324324324324325,
+   "flagged_as_any_attack": 0.9324324324324325,
+   "precision": 0.9139072847682119
+  },
+  "BENIGN": {
+   "flows": 150222,
+   "false_alarm_rate": 0.0018971921556096838
+  }
+ },
+ "firewall": {
+  "block_rate_on_attack_flows": 0.5358851674641149,
+  "block_rate_on_benign_flows": 0.00019970443743259976,
+  "block_rate_when_verdict_is_attack": 0.5525876460767947,
+  "block_rate_when_verdict_benign_but_flow_is_attack": 0.08306709265175719
+ },
+ "response": {
+  "attack_flows": {
+   "No action": 0.8995215311004785,
+   "Alert": 0.009569377990430622,
+   "Isolate": 0.09090909090909091
+  },
+  "benign_flows": {
+   "No action": 0.9999733727416756,
+   "Alert": 1.3313629162173316e-05,
+   "Isolate": 1.3313629162173316e-05
+  }
+ }
+}

@@ -1,22 +1,22 @@
 {
-  "harmful_steps": 5159,
+  "harmful_steps": 489,
   "exactly_one_agent": 0,
   "root_cause_counts": {
-    "Detection": 3476,
-    "Firewall": 1683
+    "Firewall": 441,
+    "Detection": 48
   },
   "shap_shares_by_root_cause": {
-    "Detection": {
-      "Detection verdict": 0.7165202494013011,
-      "repeat count": 0.1562844591272624,
-      "packet rate": 0.09840804343324298,
-      "context": 0.028787248038193537
-    },
     "Firewall": {
-      "Detection verdict": 0.4740233908879672,
-      "repeat count": 0.35881979393843494,
-      "packet rate": 0.030097335693483232,
-      "context": 0.13705947948011477
+      "Detection verdict": 0.0,
+      "repeat count": 0.043707228240032994,
+      "packet rate": 0.8755662439769081,
+      "context": 0.08072652778305887
+    },
+    "Detection": {
+      "Detection verdict": 0.0,
+      "repeat count": 0.15971279604334082,
+      "packet rate": 0.4060372707382501,
+      "context": 0.43424993321840905
     }
   }
 }

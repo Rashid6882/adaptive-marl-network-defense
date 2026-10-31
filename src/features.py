@@ -51,8 +51,8 @@ REPEAT_OFFENDER_THRESHOLD = 5  # dport_repeat_count above this => "repeat offend
 # minority classes get per occurrence, compensating for seeing them less often.
 DETECTION_CLASS_WEIGHT = {
     "BENIGN": 1.0,
-    "DDoS": 1.0,
-    "PortScan": 1.3,
+    "DDoS": 2.5,
+    "PortScan": 2.5,
     "BruteForce": 2.5,
 }
 
