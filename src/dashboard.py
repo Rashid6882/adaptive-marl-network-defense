@@ -48,6 +48,8 @@ from src.evaluate_sim import (
 from src.features import CLASSES, FIREWALL_ACTIONS, RESPONSE_ACTIONS
 # Imports the simulator and the test-data loader.
 from src.sim_env import DefenseSim, load_split_cached
+# Imports the "Live pipeline" demo tab.
+from src import live_demo
 
 # Sets the browser tab title and wide layout.
 st.set_page_config(page_title="Adaptive MARL Network Defense", layout="wide")
@@ -142,8 +144,8 @@ def simulate_window(sim, policy, start, steps):
     return pd.DataFrame(rows), stats
 
 
-# Creates two tabs: "What is this?" and "Interactive RL".
-tab_about, tab_rl = st.tabs(["What is this?", "Interactive RL"])
+# Creates three tabs: "What is this?", "Live pipeline demo" and "Interactive RL".
+tab_about, tab_live, tab_rl = st.tabs(["What is this?", "Live pipeline demo", "Interactive RL"])
 
 # Starts the content of the first tab.
 with tab_about:
@@ -217,6 +219,8 @@ The agents are rewarded on these outcomes and learn with PPO. They never see the
     # burst and a system.
     st.markdown(
         """
+- **Live pipeline demo** tab: press Play and watch real flows travel through Detection, Firewall and
+  Response one by one, with the hidden truth revealed at the end of each flow.
 - **Interactive RL** tab: the closed-loop results table, then a simulation where you pick an attack
   type, a burst of traffic and a system, and watch cumulative damage with and without a defense.
   Switch the system to compare the 3-agent system with the rule-based and single-agent baselines.
@@ -453,3 +457,9 @@ with tab_rl:
         else:
             # ...show a message that no curves were found.
             st.info("No reward curves found.")
+
+# Starts the content of the live demo tab. It is drawn last because its Play button runs an animation that
+# would otherwise hold up the other tabs.
+with tab_live:
+    # Loads the simulator and policies (cached) and draws the live demo.
+    live_demo.render(*load_sim())
