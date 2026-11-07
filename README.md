@@ -1,12 +1,33 @@
 # Adaptive Multi-Agent RL for Intelligent Network Defense
 
-Three reinforcement-learning agents (Detection -> Firewall -> Response) defend a simulated
-network. The traffic is real recorded CICIDS2017 flows, but the **agents' actions change what
+Term project for **22AIE401 Reinforcement Learning**, Amrita Vishwa Vidyapeetham, Amritapuri.
+Team: Muhammed Rashid R, Nirraanjan Naarayan MR, Muhammed Hashir.
+
+Three reinforcement-learning agents (**Detection -> Firewall -> Response**) defend a simulated
+network. The traffic is real recorded **CICIDS2017** flows, but the **agents' actions change what
 happens next**: blocking an attacker removes its later flows, letting an attack through causes
 damage that keeps growing, and wrongly blocking normal traffic disrupts service. The agents learn
-from these outcomes with PPO and never see the true labels.
+from these outcomes with PPO and never see the true labels as input.
 
-## Main findings
+## Table of contents
+
+1. [Overview and main findings](#overview-and-main-findings)
+2. [How it works](#how-it-works)
+3. [Repository structure](#repository-structure)
+4. [Requirements and installation](#requirements-and-installation)
+5. [Dataset](#dataset)
+6. [Quick start: run the demo](#quick-start-run-the-demo)
+7. [Reproducing the results](#reproducing-the-results)
+8. [Implementation details](#implementation-details)
+9. [Results](#results)
+10. [Diagnosis: which agent failed](#diagnosis-which-agent-failed)
+11. [Honest limitations](#honest-limitations)
+
+## Overview and main findings
+
+Rule-based defenses use fixed thresholds, and supervised intrusion detectors predict a label and
+stop there, so neither learns from what its own decisions cause. We treat network defense as a
+sequential decision problem and build a closed-loop simulator on top of recorded traffic.
 
 - **Learned agents beat rule baselines by a large margin.** On the held-out test stream the 3-agent
   system cuts attack damage by 98.9% (a tuned rule baseline: 77.9%, while disrupting 19.5% of benign flows).
@@ -15,27 +36,172 @@ from these outcomes with PPO and never see the true labels.
   a performance advantage for MARL.
 - **What the multi-agent design does give us is traceability.** Because the agents are separate we
   can fix one agent at a time and see which one caused a failure, and SHAP shows what each agent
-  relied on. This found why one seed failed (see "Why did it fail?" below) and led to a fix.
+  relied on. This found why one seed failed (see the diagnosis section) and led to a fix.
 - **Limits:** the simulator is our own model of consequences on a recorded trace, results come from
   4 seeds with large spread, and the Response agent mostly stays passive.
 
-## Dataset and setup
+## How it works
+
+```
+ recorded flows            +--------------------- one decision per flow ---------------------+
+ (CICIDS2017)  -->  DefenseSim --> Detection --> Firewall --> Response --> joint action
+                       ^           (26 inputs)   (11 inputs)  (9 inputs)         |
+                       |                                                          v
+                       +------ updates state (blocks, alerts, outages) <--- outcome + reward
+                                 contained attackers drop out of the later stream
+```
+
+On every flow the three agents decide in order, each seeing the output of the one before it. The
+simulator applies the joint action, uses the hidden label to compute damage, disruption and cost,
+updates its state, and moves to the next flow that still needs a decision.
+
+## Repository structure
+
+```
+.
+|-- README.md
+|-- requirements.txt
+|-- src/
+|   |-- sim_env.py          Simulator (DefenseSim), role environments, single-agent environment
+|   |-- train_sim.py        Per-role PPO training with warm start and frozen partners
+|   |-- evaluate_sim.py     Closed-loop evaluation of all systems
+|   |-- tune_rule.py        Validation-only tuning of the rule baseline
+|   |-- baseline_rule.py    The rule-based baseline
+|   |-- aggregate_seeds.py  Mean +/- std tables across seeds
+|   |-- explain_agents.py   Counterfactual blame and SHAP shares per root cause
+|   |-- explain_shap.py     Per-decision SHAP explanations and the coverage check
+|   |-- per_agent_stats.py  What each agent actually does on the test stream
+|   |-- data.py             Data cleaning, chronological split, repeat-count feature
+|   |-- features.py         Feature list, class names, shaping reward tables
+|   |-- env.py              Feature scaler and scaled arrays
+|   |-- single_agent_env.py Joint-action encoding for the single-agent baseline
+|   |-- dashboard.py        Streamlit dashboard (results, live demo, replay)
+|   `-- live_demo.py        "Live pipeline demo" tab used by the dashboard
+|-- runs/
+|   |-- seed1 ... seed4/    Trained agents, scaler, evaluation and explanation outputs per seed
+|   |-- summary_{val,test}.md / .json   Aggregated results
+|   `-- tuned_rule.json     Tuned rule-baseline thresholds
+|-- outputs/                Cached cleaned data and training curves (generated on first run)
+|-- archive/                Earlier protocol results, pre-registration and the adaptation pilot
+`-- DATASET/                CICIDS2017 CSV files (not in the repository, see below)
+```
+
+## Requirements and installation
+
+- Python 3.11 (tested), CPU only, no GPU needed
+- About 8 GB of RAM is comfortable. Loading the data and models needs a few GB.
+
+Python packages (`requirements.txt`):
+
+| Package | Used for |
+|---|---|
+| `stable-baselines3[extra]` (installs PyTorch) | PPO implementation |
+| `gymnasium` | Environment interface |
+| `numpy`, `pandas`, `scikit-learn`, `joblib` | Data handling, feature scaling, saving models and scalers |
+| `shap` | Kernel SHAP explanations |
+| `matplotlib` | Plots |
+| `streamlit` | Interactive dashboard |
 
 ```bash
+git clone https://github.com/Rashid6882/adaptive-marl-network-defense.git
+cd adaptive-marl-network-defense
 pip install -r requirements.txt
 ```
 
+The repository's default branch is `v2`.
+
+## Dataset
+
 The CICIDS2017 CSVs (~844 MB) are not included in this repository. Download the
-MachineLearningCVE release and place the three files used
-(`Tuesday-WorkingHours.pcap_ISCX.csv`,
-`Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv`,
-`Friday-WorkingHours-Afternoon-PortScan.pcap_ISCX.csv`) in a `DATASET/` folder.
+**MachineLearningCVE** release from the Canadian Institute for Cybersecurity
+(<https://www.unb.ca/cic/datasets/ids-2017.html>) and place the three files used in a `DATASET/` folder:
+
+- `Tuesday-WorkingHours.pcap_ISCX.csv` (FTP and SSH brute force)
+- `Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv` (DDoS)
+- `Friday-WorkingHours-Afternoon-PortScan.pcap_ISCX.csv` (port scan)
+
+On first use the data is cleaned and cached in `outputs/`, so later runs start faster.
 
 **Known limitation:** this CSV release has no Source IP column. A destination-port repeat count
-(`dport_repeat_count`) stands in for "repeat offender" signals, and in the simulator an attacker is
-identified by its attack class within an episode.
+(`dport_repeat_count`, how many of the last 50 flows used the same port) stands in for "repeat
+offender" signals, and in the simulator an attacker is identified by its attack class within an episode.
 
-## How the simulator works (`src/sim_env.py`)
+## Quick start: run the demo
+
+The trained agents for all four seeds are included in `runs/`, so you do not need to train anything
+to see the system working. After placing the dataset in `DATASET/`:
+
+```bash
+python -m streamlit run src/dashboard.py
+```
+
+Then open <http://localhost:8501>. The first load takes a minute or two.
+
+The dashboard has three tabs:
+
+- **What is this?** A short explanation of the system.
+- **Live pipeline demo.** Press Play and watch real test flows travel through Detection, Firewall
+  and Response one at a time. Each flow shows what every agent decided and what really happened
+  (the hidden truth is revealed only at the end), and a graph compares total attack damage with the
+  chosen defense against no defense over the same stretch of traffic.
+- **Interactive RL.** The 4-seed results table, a replay of a chosen attack burst with and without a
+  defense, and training curves. The replay uses the seed-1 models.
+
+## Reproducing the results
+
+### Training (`src/train_sim.py`)
+
+PPO (Stable-Baselines3, MlpPolicy, CPU, `n_steps=2048`, `batch_size=256`, `ent_coef=0.01`). One agent
+trains at a time while the other two are frozen partners (a rule-based policy stands in for any
+partner that has no trained model yet). Running the stages repeatedly gives **round-robin
+co-training**: each agent warm-starts and trains against the others' latest learned policies.
+
+Both systems get the **same total budget of 1.2M environment steps**, per seed. Seeds 1 to 4. One
+agent takes roughly 15 to 50 minutes on a CPU depending on machine load.
+
+```bash
+D=runs/seed1; S=1      # repeat for seeds 2, 3, 4 (change both)
+C="--use-val-split --seed-id $S --models-dir $D --bf-anchor 0.5"
+
+# 3-agent system. Round 0, then round 1 (warm start; partners are now learned policies)
+python -m src.train_sim --role detection --steps 300000 --fresh $C
+python -m src.train_sim --role firewall  --steps 200000 --fresh $C
+python -m src.train_sim --role response  --steps 150000 --fresh $C
+python -m src.train_sim --role detection --steps 250000 $C
+python -m src.train_sim --role firewall  --steps 150000 $C
+python -m src.train_sim --role response  --steps 150000 $C
+
+# Single-agent baseline, same budget
+python -m src.train_sim --role single --steps 1200000 --fresh $C
+
+# Rule baseline thresholds, tuned on validation only
+python -m src.tune_rule --out runs/tuned_rule.json --trials 1200
+```
+
+### Evaluation (`src/evaluate_sim.py`)
+
+Each system is run closed-loop over the whole held-out stream (test: 171,699 flows, file by file),
+and its own actions determine which flows it sees.
+
+```bash
+python -m src.evaluate_sim --models-dir runs/seed1 --split val  --out runs/seed1/eval_val.json  --tuned-rule runs/tuned_rule.json
+python -m src.evaluate_sim --models-dir runs/seed1 --split test --out runs/seed1/eval_test.json --tuned-rule runs/tuned_rule.json
+python -m src.aggregate_seeds --glob "runs/seed*/eval_test.json" --out runs/summary_test
+```
+
+### Analysis
+
+```bash
+python -m src.explain_agents --models-dir runs/seed1 --out runs/seed1/explain.json   # blame and SHAP shares per root cause
+python -m src.explain_shap --models-dir runs/seed1                                   # per-decision SHAP explanations and coverage check
+python -m src.per_agent_stats 1                                                      # what each agent does on the test stream (seed 1)
+```
+
+Change `seed1` / `1` for the other seeds. The outputs are written next to the models in `runs/seedK/`.
+
+## Implementation details
+
+### The simulator (`src/sim_env.py`)
 
 Each step the agents decide on one flow, in order: Detection -> Firewall -> Response. The
 simulator then applies the joint action.
@@ -71,46 +237,19 @@ them on BruteForce, the rest split between DDoS and PortScan), the rest random. 
 cleaned flows, split **chronologically per file into 70% train / 10% validation / 20% test**.
 Tuning and diagnosis use validation only; the test stream is evaluated once, at the end.
 
-## Training (`src/train_sim.py`)
+### How the code flows
 
-PPO (Stable-Baselines3, MlpPolicy, CPU, `n_steps=2048`, `batch_size=256`, `ent_coef=0.01`). One agent
-trains at a time while the other two are frozen partners (a rule-based policy stands in for any
-partner that has no trained model yet). Running the stages repeatedly gives **round-robin
-co-training**: each agent warm-starts and trains against the others' latest learned policies.
+1. `data.py` loads and cleans the CSVs, adds the repeat-count feature and splits each file in time.
+2. `features.py` and `env.py` hold the feature list, the shaping rewards and the scaler fitted on training rows.
+3. `sim_env.py` builds the simulator and the Gym environments for each role and for the single agent.
+4. `train_sim.py` trains one role at a time with PPO and saves the agents under `runs/seedK/`.
+5. `tune_rule.py` tunes the rule baseline on validation; `evaluate_sim.py` runs all systems closed-loop.
+6. `aggregate_seeds.py` averages the four seeds; the `explain_*` scripts and `per_agent_stats.py` analyse failures.
+7. `dashboard.py` and `live_demo.py` show it interactively.
 
-Both systems get the **same total budget of 1.2M environment steps**, per seed. Seeds 1 to 4:
+## Results
 
-```bash
-D=runs/seed1; S=1      # repeat for seeds 2, 3, 4 (change both)
-C="--use-val-split --seed-id $S --models-dir $D --bf-anchor 0.5"
-
-# 3-agent system. Round 0, then round 1 (warm start; partners are now learned policies)
-python -m src.train_sim --role detection --steps 300000 --fresh $C
-python -m src.train_sim --role firewall  --steps 200000 --fresh $C
-python -m src.train_sim --role response  --steps 150000 --fresh $C
-python -m src.train_sim --role detection --steps 250000 $C
-python -m src.train_sim --role firewall  --steps 150000 $C
-python -m src.train_sim --role response  --steps 150000 $C
-
-# Single-agent baseline, same budget
-python -m src.train_sim --role single --steps 1200000 --fresh $C
-
-# Rule baseline thresholds, tuned on validation only
-python -m src.tune_rule --out runs/tuned_rule.json --trials 1200
-```
-
-## Evaluation (`src/evaluate_sim.py`)
-
-Each system is run closed-loop over the whole held-out stream (test: 171,699 flows, file by file),
-and its own actions determine which flows it sees.
-
-```bash
-python -m src.evaluate_sim --models-dir runs/seed1 --split val  --out runs/seed1/eval_val.json  --tuned-rule runs/tuned_rule.json
-python -m src.evaluate_sim --models-dir runs/seed1 --split test --out runs/seed1/eval_test.json --tuned-rule runs/tuned_rule.json
-python -m src.aggregate_seeds --glob "runs/seed*/eval_test.json" --out runs/summary_test
-```
-
-### Results on the held-out test stream (mean +/- std over 4 seeds)
+### Held-out test stream (mean +/- std over 4 seeds)
 
 | System | Total loss | Damage reduction | Benign flows disrupted | Mean latency (flows) |
 |---|---|---|---|---|
@@ -165,7 +304,9 @@ Counted over flows each agent actually saw.
 - **Response is mostly passive:** it isolates 0% of attacks in three seeds and 9% in seed 4, and
   never acts on benign flows. In practice the system works mainly as Detection plus Firewall.
 
-## Why did it fail? (the diagnosis, `src/explain_agents.py`, validation stream)
+## Diagnosis: which agent failed
+
+(`src/explain_agents.py`, validation stream)
 
 In the first protocol-compliant run (3 seeds, old class weights) one seed failed badly (validation loss
 10,574). Per-agent analysis showed that Detection's recall by attack class followed its reward weights
@@ -213,7 +354,7 @@ probability within 0.02). This checks faithfulness to the model, not human under
 "Benign -> Allow" decisions SHAP values are near 0, because they are measured against an average of mostly
 routine traffic.
 
-## Results that did not go our way
+### Results that did not go our way
 
 - **Adaptation to a new attack variant** (a synthetic "slow" DDoS) was a pilot on one seed and did not
   support our hypothesis: the single agent recovered, while the 3-agent system (only Detection retrained)
@@ -221,34 +362,6 @@ routine traffic.
   project small and is in git commit `d4afdf7`.
 - **MARL vs single agent:** a tie on test (above). The earlier exploratory run that showed MARL far ahead
   used unequal training and tuning on the test stream (`archive/`); it should not be cited.
-
-## Dashboard
-
-```bash
-python -m streamlit run src/dashboard.py
-```
-
-The **Interactive RL** tab shows the 4-seed results table and lets you pick an attack type, burst and
-system to watch cumulative damage with and without a defense (it uses the seed-1 models), plus training
-curves. The first load takes a minute or two.
-
-## Files
-
-| Path | Purpose |
-|---|---|
-| `src/sim_env.py` | Simulator (`DefenseSim`), role environments, single-agent environment, config |
-| `src/train_sim.py` | Per-role PPO training with warm start and frozen partners |
-| `src/evaluate_sim.py` | Closed-loop evaluation of all systems |
-| `src/tune_rule.py`, `src/baseline_rule.py` | Rule baseline and its validation-tuned thresholds |
-| `src/aggregate_seeds.py` | Mean +/- std tables across seeds |
-| `src/explain_agents.py` | Counterfactual blame and SHAP shares per root cause |
-| `src/explain_shap.py` | Per-decision SHAP explanations and the coverage check |
-| `src/per_agent_stats.py` | What each agent actually does on the test stream |
-| `src/data.py`, `src/features.py` | Data cleaning and features, reward tables |
-| `src/env.py`, `src/single_agent_env.py` | Shared feature helpers and joint-action encoding |
-| `runs/seed{1..4}/` | Trained agents, scaler, evaluation and explanation outputs per seed |
-| `runs/summary_{val,test}.md` | Aggregated results |
-| `archive/` | Earlier protocol results, pre-registration and the adaptation pilot (kept as a record) |
 
 ## Honest limitations
 
